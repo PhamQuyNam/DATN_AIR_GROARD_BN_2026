@@ -1,0 +1,193 @@
+# configs/villages.yaml
+# Danh sách 18 làng nghề tỉnh Bắc Ninh
+# Nguồn: ListVillage.xlsx
+# Sử dụng cho: Open-Meteo Air Quality API + Weather Archive API
+
+villages:
+
+  # ── TP. Từ Sơn ────────────────────────────────────────────────────────────
+  - id: 1
+    name: "Đa Hội"
+    location: "P. Châu Khê, TP. Từ Sơn"
+    lat: 21.1230
+    lon: 105.9350
+    craft_type: "Sản xuất, tái chế sắt thép"
+    pollution_level: "very_high"
+    key_pollutants: ["co", "so2", "no2", "pm25"]
+    note: "Cực kỳ ô nhiễm. CO, SO₂, NO₂, PM2.5 cao, nhiệt độ cục bộ cao."
+
+  - id: 2
+    name: "Đồng Kỵ"
+    location: "P. Đồng Kỵ, TP. Từ Sơn"
+    lat: 21.1290
+    lon: 105.9500
+    craft_type: "Sản xuất đồ gỗ mỹ nghệ"
+    pollution_level: "high"
+    key_pollutants: ["pm10", "pm25"]
+    note: "Bụi gỗ (PM10, PM2.5), VOCs từ sơn PU."
+
+  - id: 3
+    name: "Phù Khê"
+    location: "P. Phù Khê, TP. Từ Sơn"
+    lat: 21.1420
+    lon: 105.9300
+    craft_type: "Chạm khắc gỗ mỹ nghệ"
+    pollution_level: "medium"
+    key_pollutants: ["pm10", "pm25"]
+    note: "Bụi mùn cưa lơ lửng, VOCs từ dung môi phủ bề mặt."
+
+  - id: 4
+    name: "Hương Mạc"
+    location: "P. Hương Mạc, TP. Từ Sơn"
+    lat: 21.1500
+    lon: 105.9350
+    craft_type: "Làm mộc truyền thống"
+    pollution_level: "medium"
+    key_pollutants: ["pm10"]
+    note: "Bụi gỗ (PM10), VOCs, dung môi công nghiệp."
+
+  - id: 5
+    name: "Đình Bảng"
+    location: "P. Đình Bảng, TP. Từ Sơn"
+    lat: 21.1000
+    lon: 105.9450
+    craft_type: "Rèn phần cứng, đồ mộc"
+    pollution_level: "medium"
+    key_pollutants: ["co", "so2", "pm10"]
+    note: "Khí thải lò rèn (CO, SO₂), bụi mộc."
+
+  # ── H. Yên Phong ──────────────────────────────────────────────────────────
+  - id: 6
+    name: "Văn Môn"
+    location: "X. Văn Môn, H. Yên Phong"
+    lat: 21.1760
+    lon: 105.9260
+    craft_type: "Tái chế nhôm, phế liệu"
+    pollution_level: "very_high"
+    key_pollutants: ["pm25", "pm10", "so2"]
+    note: "Cực kỳ ô nhiễm. Khói kim loại, PM2.5/PM10 vượt ngưỡng, SO₂ cao."
+
+  - id: 7
+    name: "Vọng Nguyệt"
+    location: "X. Tam Giang, H. Yên Phong"
+    lat: 21.2150
+    lon: 105.9700
+    craft_type: "Ươm tơ, dệt lụa"
+    pollution_level: "low"
+    key_pollutants: []
+    note: "Ít ô nhiễm. Dùng làm trạm đối chứng (Baseline) cho mô hình."
+    is_baseline: true
+
+  # ── TP. Bắc Ninh ──────────────────────────────────────────────────────────
+  - id: 8
+    name: "Phong Khê"
+    location: "P. Phong Khê, TP. Bắc Ninh"
+    lat: 21.1610
+    lon: 106.0310
+    craft_type: "Sản xuất, tái chế giấy"
+    pollution_level: "high"
+    key_pollutants: ["so2", "co", "no2"]
+    note: "Khí thải lò hơi đốt than/củi (SO₂, CO, NO₂), ô nhiễm nước, mùi hôi."
+
+  - id: 9
+    name: "Khắc Niệm"
+    location: "P. Khắc Niệm, TP. Bắc Ninh"
+    lat: 21.1550
+    lon: 106.0500
+    craft_type: "Làm bún"
+    pollution_level: "low"
+    key_pollutants: ["co", "so2"]
+    note: "Chủ yếu ô nhiễm nước/mùi, có CO/SO₂ từ lò than đun nấu."
+
+  - id: 10
+    name: "Châm Khê"
+    location: "P. Phong Khê, TP. Bắc Ninh"
+    lat: 21.1680
+    lon: 106.0250
+    craft_type: "Làm mộc dân dụng"
+    pollution_level: "low"
+    key_pollutants: ["pm10"]
+    note: "Bụi gỗ sinh hoạt, PM10."
+
+  # ── TX. Quế Võ / H. Gia Bình / H. Lương Tài ──────────────────────────────
+  - id: 11
+    name: "Phù Lãng"
+    location: "X. Phù Lãng, TX. Quế Võ"
+    lat: 21.1330
+    lon: 106.1830
+    craft_type: "Gốm sành truyền thống"
+    pollution_level: "medium"
+    key_pollutants: ["so2", "co"]
+    note: "Khí thải từ lò nung (SO₂, CO), nhiệt độ cao, bụi tro xỉ."
+
+  - id: 12
+    name: "Quả Cảm"
+    location: "P. Hòa Long, TP. Bắc Ninh"
+    lat: 21.2050
+    lon: 106.0400
+    craft_type: "Gốm sành"
+    pollution_level: "medium"
+    key_pollutants: ["co", "so2"]
+    note: "Khí thải từ lò nung gốm (CO, SO₂)."
+
+  - id: 13
+    name: "Đại Bái"
+    location: "X. Đại Bái, H. Gia Bình"
+    lat: 21.0650
+    lon: 106.1740
+    craft_type: "Gò, đúc đồng mỹ nghệ"
+    pollution_level: "high"
+    key_pollutants: ["pm25", "co"]
+    note: "Khói đúc kim loại, bụi xỉ than, CO cao."
+
+  - id: 14
+    name: "Xuân Lai"
+    location: "X. Xuân Lai, H. Gia Bình"
+    lat: 21.0710
+    lon: 106.1950
+    craft_type: "Tre trúc hun khói"
+    pollution_level: "medium"
+    key_pollutants: ["co", "so2", "pm25"]
+    note: "Khí thải (CO, SO₂, PM2.5) từ hun khói tre trúc bằng rơm/củi/than."
+
+  - id: 15
+    name: "Môn Quảng"
+    location: "X. Quảng Phú, H. Lương Tài"
+    lat: 21.0350
+    lon: 106.2100
+    craft_type: "Đúc đồng"
+    pollution_level: "high"
+    key_pollutants: ["co", "pm25"]
+    note: "Khói bụi đúc kim loại, CO, nhiệt độ cao cục bộ."
+
+  # ── TX. Thuận Thành ────────────────────────────────────────────────────────
+  - id: 16
+    name: "Đông Hồ"
+    location: "X. Song Hồ, TX. Thuận Thành"
+    lat: 21.0540
+    lon: 106.0620
+    craft_type: "Tranh dân gian, vàng mã"
+    pollution_level: "low"
+    key_pollutants: ["pm10"]
+    note: "Bụi giấy nhỏ, khí thải từ làm màu tự nhiên."
+
+  - id: 17
+    name: "Thanh Hoài"
+    location: "X. Thanh Khương, Thuận Thành"
+    lat: 21.0300
+    lon: 106.0200
+    craft_type: "Đậu phụ, tái chế nhựa"
+    pollution_level: "medium"
+    key_pollutants: ["co"]
+    note: "Khí thải lò than, VOCs từ nhựa đun chảy."
+
+  # ── H. Tiên Du ────────────────────────────────────────────────────────────
+  - id: 18
+    name: "Tam Tảo"
+    location: "X. Phú Lâm, H. Tiên Du"
+    lat: 21.1200
+    lon: 105.9800
+    craft_type: "Nghề mộc"
+    pollution_level: "medium"
+    key_pollutants: ["pm10"]
+    note: "Bụi mịn PM10, hóa chất phủ."

@@ -1,0 +1,29 @@
+air_quality:
+  base_url: "https://air-quality-api.open-meteo.com/v1/air-quality"
+  hourly_vars:
+    - pm2_5
+    - pm10
+    - carbon_monoxide
+    - nitrogen_dioxide
+    - sulphur_dioxide
+    - ozone
+    - aerosol_optical_depth
+    - dust
+    - european_aqi
+    - european_aqi_pm2_5
+    - us_aqi
+  timezone: "Asia/Ho_Chi_Minh"
+
+weather:
+  forecast_url: "https://api.open-meteo.com/v1/forecast"
+  archive_url:  "https://archive-api.open-meteo.com/v1/archive"
+  hourly_vars:
+    - temperature_2m
+    - relative_humidity_2m
+    - wind_speed_10m
+    - wind_direction_10m
+    - precipitation
+    - surface_pressure
+    - cloud_cover
+    - visibility
+  timezone: "Asia/Ho_Chi_Minh"

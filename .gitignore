@@ -1,0 +1,5 @@
+data/
+ml_training/data/
+*.csv
+*.parquet
+__pycache__/
