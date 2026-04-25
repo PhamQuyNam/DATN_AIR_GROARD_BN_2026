@@ -2,4 +2,6 @@ data/
 ml_training/data/
 *.csv
 *.parquet
+models/
 __pycache__/
+.venv/
