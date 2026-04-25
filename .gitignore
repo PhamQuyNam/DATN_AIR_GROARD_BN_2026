@@ -5,3 +5,4 @@ ml_training/data/
 models/
 __pycache__/
 .venv/
+*.env

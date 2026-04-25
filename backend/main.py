@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.core.database import init_db, get_session
 from app.models.db_models import Village, AQILog
+from app.scheduler.jobs import start_scheduler
 
 app = FastAPI(
     title="AirGuard BN API",
@@ -28,6 +29,7 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     init_db()
+    start_scheduler()
 
 @app.get("/")
 def read_root():
