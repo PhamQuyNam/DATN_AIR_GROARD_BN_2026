@@ -31,6 +31,14 @@ def on_startup():
     init_db()
     start_scheduler()
 
+from app.api.routes import aqi, forecast, shap, alert, analytics
+
+app.include_router(aqi.router, prefix="/api/v1", tags=["AQI"])
+app.include_router(forecast.router, prefix="/api/v1", tags=["Forecast"])
+app.include_router(shap.router, prefix="/api/v1", tags=["SHAP"])
+app.include_router(alert.router, prefix="/api/v1/alerts", tags=["Alerts"])
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to AirGuard BN API"}
