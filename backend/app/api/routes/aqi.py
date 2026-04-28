@@ -47,23 +47,24 @@ def get_current_aqi_all_villages(session: Session = Depends(get_session)):
     return {"data": results}
 
 @router.get("/aqi/history/{village_name}")
-def get_aqi_history(village_name: str, days: int = 7, session: Session = Depends(get_session)):
+def get_aqi_history(village_name: str, limit: int = 24, session: Session = Depends(get_session)):
     """
-    Lấy dữ liệu AQI lịch sử của một làng nghề trong N ngày qua (mặc định 7 ngày).
-    Dùng để vẽ biểu đồ đường (Line chart).
+    Lấy dữ liệu AQI lịch sử của một làng nghề (mặc định 24 bản ghi gần nhất).
+    Dùng để vẽ biểu đồ đường (Line chart) liên tục với dự báo.
     """
     # Kiểm tra xem làng nghề có tồn tại không
     village = session.exec(select(Village).where(Village.name == village_name)).first()
     if not village:
         raise HTTPException(status_code=404, detail="Village not found")
         
-    start_date = datetime.now() - timedelta(days=days)
-    
     logs = session.exec(
         select(AQILog)
         .where(AQILog.village_name == village_name)
-        .where(AQILog.timestamp >= start_date)
-        .order_by(AQILog.timestamp.asc())
+        .order_by(AQILog.timestamp.desc())
+        .limit(limit)
     ).all()
+    
+    logs.reverse() # Đảo ngược để dữ liệu vẽ từ trái qua phải (cũ -> mới)
+    return {"village": village_name, "data": logs}
     
     return {"village": village_name, "data": logs}
