@@ -1,20 +1,23 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { toast } from 'react-toastify';
+import { SendHorizonal, CheckCircle2, Loader2, Trash2, AlertTriangle, X } from 'lucide-react';
 
 export default function Alerts() {
   const queryClient = useQueryClient();
   const [editingVillage, setEditingVillage] = useState(null);
   const [editThreshold, setEditThreshold] = useState(150);
   const [editActive, setEditActive] = useState(true);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [selectedAlert, setSelectedAlert] = useState(null); // dialog chi tiết
 
   // Fetch configs
   const { data: configs, isLoading: loadingConfigs } = useQuery({
     queryKey: ['alertConfigs'],
     queryFn: async () => {
-      const res = await api.get('/alert/config');
+      const res = await api.get('/alerts/config');
       return res.data;
     }
   });
@@ -23,15 +26,42 @@ export default function Alerts() {
   const { data: activeAlerts, isLoading: loadingAlerts } = useQuery({
     queryKey: ['activeAlerts'],
     queryFn: async () => {
-      const res = await api.get('/alert/active');
+      const res = await api.get('/alerts/active');
       return res.data.data;
+    }
+  });
+
+  // Approve Mutation
+  const approveMutation = useMutation({
+    mutationFn: async (alertId) => {
+      return api.post(`/alerts/approve/${alertId}`);
+    },
+    onSuccess: (_, alertId) => {
+      toast.success('✅ Đã phê duyệt và gửi cảnh báo đến người dân!');
+      queryClient.invalidateQueries(['activeAlerts']);
+    },
+    onError: (err) => {
+      toast.error('Lỗi khi phê duyệt: ' + (err.response?.data?.detail || err.message));
+    }
+  });
+
+  // Delete Mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (alertId) => api.delete(`/alerts/${alertId}`),
+    onSuccess: () => {
+      toast.success('🗑️ Đã xóa cảnh báo thành công');
+      setConfirmDeleteId(null);
+      queryClient.invalidateQueries(['activeAlerts']);
+    },
+    onError: (err) => {
+      toast.error('Lỗi khi xóa: ' + (err.response?.data?.detail || err.message));
     }
   });
 
   // Update Config Mutation
   const updateConfigMutation = useMutation({
     mutationFn: async ({ village_name, data }) => {
-      return api.post(`/alert/config/${encodeURIComponent(village_name)}`, data);
+      return api.post(`/alerts/config/${encodeURIComponent(village_name)}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['alertConfigs']);
@@ -60,6 +90,7 @@ export default function Alerts() {
   };
 
   return (
+    <>
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -90,18 +121,67 @@ export default function Alerts() {
                 <div className="text-sm text-gray-500">Đang tải...</div>
               ) : activeAlerts?.length > 0 ? (
                 activeAlerts.map((alert, idx) => (
-                  <div key={idx} className="bg-white/60 dark:bg-gray-800/60 p-3 rounded-lg border border-red-200 dark:border-red-500/20 shadow-sm backdrop-blur-sm">
-                    <div className="flex justify-between items-start">
+                  <motion.div
+                    key={alert.id ?? idx}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className={`p-3 rounded-xl border shadow-sm backdrop-blur-sm cursor-pointer hover:shadow-md transition-shadow ${
+                      alert.is_approved
+                        ? 'bg-green-50/80 dark:bg-green-900/20 border-green-200 dark:border-green-500/30'
+                        : 'bg-white/60 dark:bg-gray-800/60 border-red-200 dark:border-red-500/20'
+                    }`}
+                    onClick={() => setSelectedAlert(alert)}
+                  >
+                    {/* Header card */}
+                    <div className="flex justify-between items-start mb-1">
                       <span className="font-bold text-gray-900 dark:text-gray-100">{alert.village_name}</span>
-                      <span className="text-xs text-gray-500">{new Date(alert.timestamp).toLocaleTimeString('vi-VN')}</span>
-                    </div>
-                    <p className="text-sm text-red-600 mt-1">{alert.message}</p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className="text-xs bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 px-2 py-1 rounded">
-                        AQI: {alert.aqi_value} (Ngưỡng: {alert.threshold_value})
+                      <span className="text-xs text-gray-400">
+                        {new Date(alert.timestamp).toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}
                       </span>
                     </div>
-                  </div>
+
+                    {/* Nội dung cảnh báo */}
+                    <p className="text-sm text-red-600 dark:text-red-400 mb-2">{alert.message}</p>
+
+                    {/* AQI Badge */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-xs bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 px-2 py-1 rounded-lg font-medium">
+                        AQI: {alert.aqi_value} / Ngưỡng: {alert.threshold_value}
+                      </span>
+
+                      <div className="flex items-center gap-1.5">
+                        {/* Nút Phê duyệt */}
+                        {alert.is_approved ? (
+                          <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-semibold bg-green-100 dark:bg-green-500/20 px-2.5 py-1 rounded-lg">
+                            <CheckCircle2 size={13}/> Đã gửi dân
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => approveMutation.mutate(alert.id)}
+                            disabled={approveMutation.isPending}
+                            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white transition-all shadow-sm shadow-blue-500/30"
+                          >
+                            {approveMutation.isPending ? (
+                              <Loader2 size={12} className="animate-spin"/>
+                            ) : (
+                              <SendHorizonal size={12}/>
+                            )}
+                            Phê duyệt & Gửi
+                          </button>
+                        )}
+
+                        {/* Nút Xóa */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(alert.id); }}
+                          title="Xóa cảnh báo"
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                        >
+                          <Trash2 size={14}/>
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
                 ))
               ) : (
                 <div className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2 p-3 bg-green-50 dark:bg-green-500/10 rounded-lg">
@@ -194,5 +274,171 @@ export default function Alerts() {
 
       </div>
     </motion.div>
+
+    {/* ── Dialog Chi tiết Cảnh báo ───────────────────────────────────────── */}
+    <AnimatePresence>
+      {selectedAlert && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+          onClick={() => setSelectedAlert(null)}
+        >
+          <motion.div
+            initial={{ scale: 0.92, opacity: 0, y: 15 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.92, opacity: 0, y: 15 }}
+            transition={{ type: 'spring', damping: 22 }}
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-700 overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className={`px-6 py-5 flex items-start justify-between ${
+              selectedAlert.is_approved
+                ? 'bg-green-50 dark:bg-green-900/30 border-b border-green-100 dark:border-green-700'
+                : 'bg-red-50 dark:bg-red-900/30 border-b border-red-100 dark:border-red-700'
+            }`}>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">{selectedAlert.village_name}</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Ghi nhận lúc {new Date(selectedAlert.timestamp).toLocaleString('vi-VN', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}
+                </p>
+              </div>
+              <button onClick={() => setSelectedAlert(null)}
+                className="p-1.5 rounded-full hover:bg-black/10 text-gray-400 hover:text-gray-600 transition-colors">
+                <X size={18}/>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-4">
+              {/* AQI lớn */}
+              <div className="flex items-center gap-4">
+                <div className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center font-black shadow-sm ${
+                  selectedAlert.aqi_value > 300 ? 'bg-rose-100 text-rose-700' :
+                  selectedAlert.aqi_value > 200 ? 'bg-purple-100 text-purple-700' :
+                  selectedAlert.aqi_value > 150 ? 'bg-red-100 text-red-700' :
+                  selectedAlert.aqi_value > 100 ? 'bg-orange-100 text-orange-700' :
+                  'bg-yellow-100 text-yellow-700'
+                }`}>
+                  <span className="text-3xl leading-none">{Math.round(selectedAlert.aqi_value)}</span>
+                  <span className="text-xs font-medium opacity-70">AQI</span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Ngưỡng kích hoạt</p>
+                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{selectedAlert.threshold_value}</p>
+                  <p className="text-xs text-gray-400">Vượt {(selectedAlert.aqi_value - selectedAlert.threshold_value).toFixed(1)} đơn vị</p>
+                </div>
+              </div>
+
+              {/* Nội dung cảnh báo */}
+              <div className="bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-xl p-4">
+                <p className="text-sm font-medium text-red-600 dark:text-red-400 leading-relaxed">{selectedAlert.message}</p>
+              </div>
+
+              {/* Trạng thái */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3">
+                  <p className="text-xs text-gray-400 mb-1">Trạng thái</p>
+                  {selectedAlert.is_approved ? (
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-green-600 dark:text-green-400">
+                      <CheckCircle2 size={15}/> Đã phê duyệt
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-orange-500">
+                      <Loader2 size={15}/> Chờ duyệt
+                    </span>
+                  )}
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3">
+                  <p className="text-xs text-gray-400 mb-1">Thời gian duyệt</p>
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    {selectedAlert.approved_at
+                      ? new Date(selectedAlert.approved_at).toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })
+                      : '—'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer actions */}
+            <div className="px-6 pb-5 flex gap-2">
+              {!selectedAlert.is_approved && (
+                <button
+                  onClick={() => { approveMutation.mutate(selectedAlert.id); setSelectedAlert(null); }}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold transition-colors shadow-sm shadow-blue-500/30"
+                >
+                  <SendHorizonal size={15}/> Phê duyệt & Gửi dân
+                </button>
+              )}
+              <button
+                onClick={() => { setSelectedAlert(null); setConfirmDeleteId(selectedAlert.id); }}
+                className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-200 dark:border-red-500/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 text-sm font-medium transition-colors"
+              >
+                <Trash2 size={15}/> Xóa
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+
+    {/* ── Dialog xác nhận xóa ─────────────────────────────────────────── */}
+    <AnimatePresence>
+      {confirmDeleteId && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+          onClick={() => setConfirmDeleteId(null)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 10 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 10 }}
+            transition={{ type: 'spring', damping: 20 }}
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full border border-gray-100 dark:border-gray-700"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Icon */}
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-100 dark:bg-red-500/20 mx-auto mb-4">
+              <AlertTriangle className="text-red-500" size={24}/>
+            </div>
+
+            {/* Nội dung */}
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center mb-2">
+              Xác nhận xóa cảnh báo?
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6">
+              Cảnh báo này sẽ bị xóa vĩnh viễn khỏi hệ thống và không thể khôi phục.
+              Nếu đã gửi đến người dân, họ sẽ không còn thấy cảnh báo này nữa.
+            </p>
+
+            {/* Nút hành động */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => deleteMutation.mutate(confirmDeleteId)}
+                disabled={deleteMutation.isPending}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white text-sm font-semibold transition-colors shadow-sm shadow-red-500/30"
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 size={15} className="animate-spin"/>
+                ) : (
+                  <Trash2 size={15}/>
+                )}
+                Xóa cảnh báo
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   );
 }

@@ -29,15 +29,28 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     init_db()
+    # Seed tài khoản Admin mặc định
+    from app.core.database import engine
+    from sqlmodel import Session
+    from app.services.auth_service import seed_default_admin
+    from app.services.alert_service import seed_alert_configs
+    with Session(engine) as session:
+        seed_default_admin(session)
+    seed_alert_configs()
     start_scheduler()
 
-from app.api.routes import aqi, forecast, shap, alert, analytics
+from app.api.routes import aqi, forecast, shap, alert, analytics, auth, map, history, report, citizen
 
 app.include_router(aqi.router, prefix="/api/v1", tags=["AQI"])
 app.include_router(forecast.router, prefix="/api/v1", tags=["Forecast"])
 app.include_router(shap.router, prefix="/api/v1", tags=["SHAP"])
 app.include_router(alert.router, prefix="/api/v1/alerts", tags=["Alerts"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
+app.include_router(auth.router, prefix="/api/v1", tags=["Auth"])
+app.include_router(map.router, prefix="/api/v1", tags=["Map"])
+app.include_router(history.router, prefix="/api/v1", tags=["History"])
+app.include_router(report.router, prefix="/api/v1", tags=["Report"])
+app.include_router(citizen.router, prefix="/api/v1", tags=["Citizen"])
 
 @app.get("/")
 def read_root():
