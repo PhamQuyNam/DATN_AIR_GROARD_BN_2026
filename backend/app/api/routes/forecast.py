@@ -46,3 +46,13 @@ def get_village_forecast(village_name: str, session: Session = Depends(get_sessi
     ).all()
     
     return {"village_name": village_name, "forecasts": forecasts}
+
+@router.post("/forecast/run_inference_now")
+def run_inference_now():
+    """
+    Kích hoạt chạy AI (LSTM & XGBoost) ngay lập tức thay vì đợi scheduler.
+    Phục vụ cho mục đích Test hiển thị giao diện.
+    """
+    from app.services.inference_service import inference_service
+    inference_service.run_forecast_all()
+    return {"status": "success", "message": "Đã chạy xong mô hình dự báo AI"}

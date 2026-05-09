@@ -11,3 +11,6 @@ apscheduler
 shap
 xgboost
 PyYAML
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
