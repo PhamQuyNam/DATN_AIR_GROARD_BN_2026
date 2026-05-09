@@ -61,7 +61,8 @@ CREATE TABLE IF NOT EXISTS alerts (
     time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     aqi_value INTEGER,
     alert_level VARCHAR(50),
-    is_active BOOLEAN DEFAULT TRUE
+    status VARCHAR(20) DEFAULT 'PENDING', -- Trạng thái: PENDING, APPROVED, REJECTED
+    approved_at TIMESTAMP WITH TIME ZONE
 );
 
 -- 6. Bảng Khuyến nghị của Nhà quản lý
