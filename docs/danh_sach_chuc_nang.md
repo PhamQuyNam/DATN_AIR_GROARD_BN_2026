@@ -1,10 +1,10 @@
 # TỔNG QUAN CHỨC NĂNG DỰ ÁN AIRGUARD BN
 
-Tài liệu này mô tả 10 chức năng cốt lõi của hệ thống, được chia làm 2 phân hệ chính: Dành cho Cán bộ Quản lý (Sở TN&MT) và Dành cho Người dân.
+Tài liệu này mô tả 10 chức năng cốt lõi của hệ thống, được chia làm 2 phân hệ chính: Dành cho Cán bộ Quản lý và Dành cho Người dân.
 
 ---
 
-## PHẦN I: DÀNH CHO CÁN BỘ QUẢN LÝ (ADMIN / SỞ TN&MT)
+## PHẦN I: DÀNH CHO CÁN BỘ QUẢN LÝ (ADMIN )
 
 ### 1. Bản đồ AQI thời gian thực (GIS Dashboard)
 - **Mô tả:** Màn hình chính của ban quản lý. Cung cấp một bản đồ số GIS trực quan hiển thị vị trí của toàn bộ các làng nghề trên địa bàn tỉnh.
