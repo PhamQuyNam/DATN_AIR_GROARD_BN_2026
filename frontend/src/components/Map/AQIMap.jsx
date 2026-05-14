@@ -18,8 +18,9 @@ L.Icon.Default.mergeOptions({
 });
 
 // Component tạo icon HTML tùy chỉnh (để tô màu marker)
-const createCustomIcon = (aqi) => {
-  const colorObj = getAQIColor(aqi);
+const createCustomIcon = (aqi, isActive = true) => {
+  const colorObj = isActive ? getAQIColor(aqi) : { bg: '#9ca3af', text: '#ffffff', label: 'Ngừng hoạt động' };
+  
   return L.divIcon({
     className: 'custom-icon',
     html: `
@@ -37,13 +38,47 @@ const createCustomIcon = (aqi) => {
         border: 2px solid white;
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         transition: transform 0.2s;
+        filter: ${isActive ? 'none' : 'grayscale(0.5)'};
       " class="hover:scale-110 hover:shadow-lg">
-        ${Math.round(aqi)}
+        ${isActive ? Math.round(aqi) : '!'}
       </div>
     `,
     iconSize: [36, 36],
     iconAnchor: [18, 18],
   });
+};
+
+// Component Legend (Chú giải)
+const MapLegend = () => {
+  const thresholds = [
+    { range: '0 - 50', label: 'Tốt', color: '#00E400' },
+    { range: '51 - 100', label: 'Trung bình', color: '#FFFF00' },
+    { range: '101 - 150', label: 'Kém', color: '#FF7E00' },
+    { range: '151 - 200', label: 'Xấu', color: '#FF0000' },
+    { range: '201 - 300', label: 'Rất xấu', color: '#8F3F97' },
+    { range: '301+', label: 'Nguy hại', color: '#7E0023' },
+    { range: '--', label: 'Ngừng hoạt động', color: '#9ca3af' },
+  ];
+
+  return (
+    <div className="absolute bottom-6 left-6 z-[1000] bg-white/90 dark:bg-gray-800/90 backdrop-blur-md p-4 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl max-w-[200px]">
+      <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-1">Chỉ số AQI</h4>
+      <div className="space-y-2">
+        {thresholds.map((t, i) => (
+          <div key={i} className="flex items-center gap-3 group">
+            <div 
+              className="w-3 h-3 rounded-full shadow-sm group-hover:scale-125 transition-transform" 
+              style={{ backgroundColor: t.color }} 
+            />
+            <div className="flex flex-col">
+              <span className="text-[11px] font-bold text-gray-900 dark:text-white leading-none">{t.label}</span>
+              <span className="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5">{t.range}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 export default function AQIMap() {
@@ -73,13 +108,13 @@ export default function AQIMap() {
   });
 
   if (isLoading) return (
-    <div className="flex items-center justify-center h-full">
+    <div className="flex items-center justify-center h-full min-h-[600px]">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
     </div>
   );
 
   if (error) return (
-    <div className="text-red-500 text-center">
+    <div className="text-red-500 text-center py-20">
       Lỗi tải dữ liệu bản đồ: {error.message}
     </div>
   );
@@ -139,6 +174,9 @@ export default function AQIMap() {
         </AnimatePresence>
       </div>
 
+      {/* Legend Component */}
+      <MapLegend />
+
       <MapContainer 
         center={bacNinhCenter} 
         zoom={11} 
@@ -174,40 +212,47 @@ export default function AQIMap() {
         />
 
         {data?.map((village, idx) => (
-
           <Marker 
             key={idx} 
             position={[village.lat, village.lon]}
-            icon={createCustomIcon(village.aqi)}
+            icon={createCustomIcon(village.aqi, village.is_active !== false)}
           >
             <Tooltip direction="top" offset={[0, -15]} opacity={1} className="custom-hover-tooltip">
               <div className="p-1 min-w-[200px] font-sans">
-                <h3 className="font-extrabold text-[1.1rem] mb-1.5 tracking-tight">{village.village_name}</h3>
+                <div className="flex items-center justify-between mb-1.5">
+                  <h3 className="font-extrabold text-[1.1rem] tracking-tight">{village.village_name}</h3>
+                  {village.is_active === false && (
+                    <span className="text-[9px] font-bold bg-gray-500 text-white px-1.5 py-0.5 rounded uppercase">Ngừng hoạt động</span>
+                  )}
+                </div>
                 
                 <div className="flex items-center gap-2 mb-3">
                   <span 
                     className="px-3 py-1 rounded-full text-[11px] font-bold shadow-sm uppercase tracking-wider" 
-                    style={{ backgroundColor: getAQIColor(village.aqi).bg, color: getAQIColor(village.aqi).text }}
+                    style={{ 
+                      backgroundColor: village.is_active !== false ? getAQIColor(village.aqi).bg : '#9ca3af', 
+                      color: village.is_active !== false ? getAQIColor(village.aqi).text : '#ffffff' 
+                    }}
                   >
-                    AQI: {Math.round(village.aqi)} ({village.level})
+                    AQI: {village.is_active !== false ? Math.round(village.aqi) : '--'} ({village.is_active !== false ? village.level : 'N/A'})
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
                   <div className="opacity-70 font-medium">PM2.5:</div>
-                  <div className="font-semibold text-right">{village.pm25?.toFixed(1) || '--'} µg/m³</div>
+                  <div className="font-semibold text-right">{village.is_active !== false ? village.pm25?.toFixed(1) : '--'} µg/m³</div>
                   
                   <div className="opacity-70 font-medium">CO:</div>
-                  <div className="font-semibold text-right">{village.co?.toFixed(1) || '--'} µg/m³</div>
+                  <div className="font-semibold text-right">{village.is_active !== false ? village.co?.toFixed(1) : '--'} µg/m³</div>
                   
                   <div className="opacity-70 font-medium">SO2:</div>
-                  <div className="font-semibold text-right">{village.so2?.toFixed(1) || '--'} µg/m³</div>
+                  <div className="font-semibold text-right">{village.is_active !== false ? village.so2?.toFixed(1) : '--'} µg/m³</div>
                   
                   <div className="opacity-70 font-medium">NO2:</div>
-                  <div className="font-semibold text-right">{village.no2?.toFixed(1) || '--'} µg/m³</div>
+                  <div className="font-semibold text-right">{village.is_active !== false ? village.no2?.toFixed(1) : '--'} µg/m³</div>
                   
                   <div className="opacity-70 font-medium">O3:</div>
-                  <div className="font-semibold text-right">{village.o3?.toFixed(1) || '--'} µg/m³</div>
+                  <div className="font-semibold text-right">{village.is_active !== false ? village.o3?.toFixed(1) : '--'} µg/m³</div>
                 </div>
 
                 <div className="mt-4 pt-2 border-t border-gray-200 dark:border-gray-700 text-[11px] opacity-50 font-medium text-right italic">
@@ -221,3 +266,4 @@ export default function AQIMap() {
     </div>
   );
 }
+

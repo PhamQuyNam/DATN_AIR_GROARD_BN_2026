@@ -122,18 +122,29 @@ export default function StationStatus() {
                   <th className="px-5 py-3">AQI hiện tại</th>
                   <th className="px-5 py-3">Mức độ</th>
                   <th className="px-5 py-3">Cập nhật lần cuối</th>
+                  <th className="px-5 py-3">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {stations.map((s, idx) => {
                   const aqiColor = AQI_COLORS[s.current_level] || AQI_COLORS['Trung bình'];
+                  
+                  const handleToggle = async () => {
+                    try {
+                      await api.patch(`/villages/${s.village_name}/toggle`);
+                      refetch();
+                    } catch (err) {
+                      alert("Lỗi khi thay đổi trạng thái trạm");
+                    }
+                  };
+
                   return (
                     <motion.tr
                       key={s.village_name}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.03 }}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                      className={`hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors ${!s.is_active ? 'opacity-60 bg-gray-50/50 dark:bg-gray-900/20' : ''}`}
                     >
                       {/* Tên trạm */}
                       <td className="px-5 py-4">
@@ -144,18 +155,18 @@ export default function StationStatus() {
                       {/* Trạng thái */}
                       <td className="px-5 py-4">
                         <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${
-                          s.is_online
+                          s.is_online && s.is_active
                             ? 'bg-green-500/15 text-green-500 border border-green-500/30'
                             : 'bg-red-500/15 text-red-400 border border-red-500/30'
                         }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${s.is_online ? 'bg-green-500 animate-pulse' : 'bg-red-400'}`} />
-                          {s.is_online ? 'Online' : 'Offline'}
+                          <span className={`w-1.5 h-1.5 rounded-full ${s.is_online && s.is_active ? 'bg-green-500 animate-pulse' : 'bg-red-400'}`} />
+                          {!s.is_active ? 'Đã tắt' : (s.is_online ? 'Online' : 'Offline')}
                         </div>
                       </td>
 
                       {/* AQI */}
                       <td className="px-5 py-4">
-                        {s.current_aqi != null ? (
+                        {s.current_aqi != null && s.is_active ? (
                           <span className={`text-lg font-bold ${aqiColor.text}`}>{s.current_aqi}</span>
                         ) : (
                           <span className="text-gray-400">—</span>
@@ -164,8 +175,8 @@ export default function StationStatus() {
 
                       {/* Mức độ */}
                       <td className="px-5 py-4">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium border ${aqiColor.bg} ${aqiColor.text} ${aqiColor.border}`}>
-                          {s.current_level}
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium border ${s.is_active ? `${aqiColor.bg} ${aqiColor.text} ${aqiColor.border}` : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+                          {s.is_active ? s.current_level : 'Ngừng hoạt động'}
                         </span>
                       </td>
 
@@ -175,6 +186,20 @@ export default function StationStatus() {
                           <Clock size={13} />
                           <span className="text-xs">{s.time_ago}</span>
                         </div>
+                      </td>
+
+                      {/* Thao tác */}
+                      <td className="px-5 py-4">
+                        <button
+                          onClick={handleToggle}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            s.is_active 
+                              ? 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white' 
+                              : 'bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white'
+                          }`}
+                        >
+                          {s.is_active ? 'Tắt hoạt động' : 'Bật hoạt động'}
+                        </button>
                       </td>
                     </motion.tr>
                   );

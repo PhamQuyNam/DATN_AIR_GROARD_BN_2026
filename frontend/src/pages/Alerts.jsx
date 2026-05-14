@@ -79,7 +79,8 @@ export default function Alerts() {
     setEditActive(config.is_active);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // 1. Cập nhật cấu hình cảnh báo (ngưỡng AQI, bật/tắt alert)
     updateConfigMutation.mutate({
       village_name: editingVillage,
       data: {
@@ -87,6 +88,19 @@ export default function Alerts() {
         is_active: editActive
       }
     });
+
+    // 2. Đồng bộ trạng thái hoạt động của trạm trên bản đồ
+    // Tìm config hiện tại để so sánh xem người dùng có vừa thay đổi trạng thái không
+    const currentConfig = configs.find(c => c.village_name === editingVillage);
+    if (currentConfig && currentConfig.is_active !== editActive) {
+      try {
+        await api.patch(`/villages/${editingVillage}/toggle`);
+        // Refresh lại dữ liệu bản đồ nếu cần (tùy vào các component khác dùng chung cache)
+        queryClient.invalidateQueries(['aqiCurrent']);
+      } catch (err) {
+        console.error("Lỗi khi đồng bộ trạng thái trạm:", err);
+      }
+    }
   };
 
   return (

@@ -72,6 +72,7 @@ def get_station_status(session: Session = Depends(get_session)):
             "lon": v.lon,
             "status": status,
             "is_online": is_online,
+            "is_active": v.is_active,  # Trạng thái admin bật/tắt
             "current_aqi": current_aqi,
             "current_level": current_level,
             "last_seen": last_seen,

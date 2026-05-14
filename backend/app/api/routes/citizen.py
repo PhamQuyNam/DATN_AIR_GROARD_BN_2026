@@ -106,17 +106,16 @@ def get_citizen_feed(
             .where(AlertHistory.village_name == village_name)
             .where(AlertHistory.is_approved == True)
             .order_by(AlertHistory.approved_at.desc())
-            .limit(3)
+            .limit(20)  # Tăng từ 3 → 20 để hiển thị đủ cảnh báo
         ).all()
 
-        # ── Khuyến nghị mới nhất từ Manager ───────────────────────────────────
-        latest_rec = session.exec(
+        # ── Tất cả khuyến nghị đang hoạt động từ Manager ──────────────────────
+        all_recs = session.exec(
             select(Recommendation)
             .where(Recommendation.village_name == village_name)
             .where(Recommendation.is_active == True)
             .order_by(Recommendation.created_at.desc())
-            .limit(1)
-        ).first()
+        ).all()
 
         stations_data.append({
             "village_name": village_name,
@@ -139,9 +138,16 @@ def get_citizen_feed(
                 }
                 for a in approved_alerts
             ],
-            # Khuyến nghị (tách riêng với cảnh báo)
-            "recommendation": latest_rec.content if latest_rec else None,
-            "rec_time": latest_rec.created_at if latest_rec else None,
+            # Tất cả khuyến nghị đang hoạt động (không giới hạn 1 bản)
+            "recommendation": all_recs[0].content if all_recs else None,
+            "rec_time": all_recs[0].created_at if all_recs else None,
+            "all_recommendations": [
+                {
+                    "content": r.content,
+                    "created_at": r.created_at,
+                }
+                for r in all_recs
+            ],
         })
 
     return {

@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  db:
+    image: timescale/timescaledb:latest-pg14
+    container_name: airguard_db
+    restart: always
+    environment:
+      - POSTGRES_DB=airguard_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=Quynam26@
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    container_name: airguard_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:Quynam26%40@db:5432/airguard_db
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+      - ./configs:/app/configs
+      - ./data:/app/data
+
+volumes:
+  postgres_data:
