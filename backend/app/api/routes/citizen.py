@@ -35,9 +35,19 @@ def add_favorite(
     session: Session = Depends(get_session)
 ):
     """Thêm một làng vào danh sách quan tâm của người dùng."""
-    village = session.exec(select(Village).where(Village.name == village_name)).first()
+    # Tìm kiếm không phân biệt hoa thường
+    village = session.exec(
+        select(Village).where(Village.name.ilike(village_name))
+    ).first()
+    
     if not village:
-        raise HTTPException(status_code=404, detail="Không tìm thấy làng nghề")
+        # Nếu không tìm thấy, thử tìm kiếm tương đối (cho phép khớp một phần)
+        village = session.exec(
+            select(Village).where(Village.name.contains(village_name))
+        ).first()
+        
+    if not village:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy làng nghề: {village_name}")
 
     # Kiểm tra đã tồn tại chưa
     existing = session.exec(
