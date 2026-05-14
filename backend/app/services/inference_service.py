@@ -82,8 +82,8 @@ class InferenceService:
         with Session(engine) as session:
             villages = session.exec(select(Village)).all()
             
-            lstm_window = self.lstm_meta['config']['window'] # 48
-            lstm_features = self.lstm_meta['config']['features']
+            lstm_window = 12 # Model .h5 cũ train với window=12
+            lstm_features = self.lstm_meta['config']['features'][:11] # Lấy đúng 11 features
             
             for v in villages:
                 # 1. Lấy dữ liệu 48 giờ gần nhất của làng nghề này
@@ -125,28 +125,57 @@ class InferenceService:
                     if 'aqi' in df_recent.columns:
                         df_recent['aqi_current'] = df_recent['aqi']
                         
-                    # Trích xuất đúng 16 features mà LSTM cần, thay thế NaN bằng 0
-                    X_lstm = df_recent[lstm_features].fillna(0).values
-                    # Reshape thành (1, 48, 16)
-                    X_lstm = X_lstm.reshape((1, lstm_window, len(lstm_features)))
+                    # Trích xuất đúng 11 features mà LSTM cần
+                    X_raw = df_recent[lstm_features].fillna(0)
+                    
+                    # Chuẩn hóa (Scale) động dựa trên chính dữ liệu quá khứ gần nhất (Self-Scaling)
+                    means = X_raw.mean()
+                    stds = X_raw.std().replace(0, 1) # Tránh chia cho 0
+                    X_scaled = (X_raw - means) / stds
+                    
+                    # Lấy 12 giờ gần nhất và Reshape thành (1, 12, 11)
+                    X_lstm = X_scaled.values[-lstm_window:].reshape((1, lstm_window, len(lstm_features)))
                     
                     # Predict 6 horizon
                     # LSTM output thường là (1, 6) nếu dự báo 6 step AQI
                     preds_lstm = self.lstm_model.predict(X_lstm, verbose=0)[0]
                     
+                    # Unscale ngược lại ra giá trị AQI thật
+                    mean_aqi = means.get('aqi_current', 84.0)
+                    std_aqi = stds.get('aqi_current', 42.0)
+                    preds_real = (preds_lstm * std_aqi) + mean_aqi
+                    
                     # Lưu vào ForecastLog
                     old_forecasts = session.exec(select(ForecastLog).where(ForecastLog.village_name == v.name)).all()
                     for old in old_forecasts: session.delete(old)
                     
-                    for i in range(len(preds_lstm)):
-                        forecast = ForecastLog(
-                            village_name=v.name,
-                            timestamp=latest_data.timestamp + timedelta(hours=i+1),
-                            predicted_aqi=float(preds_lstm[i]),
-                            forecast_hour=i+1,
-                            model_used="lstm_attention_48h"
-                        )
-                        session.add(forecast)
+                    if len(preds_real) == 1:
+                        # Model chỉ dự báo 1 điểm (t+6), tiến hành nội suy tuyến tính (Linear Interpolation) 
+                        # từ AQI hiện tại đến điểm t+6 để biểu đồ frontend vẽ đủ 6 điểm
+                        current_aqi = df_recent['aqi_current'].iloc[-1]
+                        target_aqi_6h = float(preds_real[0])
+                        
+                        for i in range(1, 7): # Từ t+1 đến t+6
+                            interpolated_aqi = current_aqi + (target_aqi_6h - current_aqi) * (i / 6.0)
+                            forecast = ForecastLog(
+                                village_name=v.name,
+                                timestamp=latest_data.timestamp + timedelta(hours=i),
+                                predicted_aqi=float(interpolated_aqi),
+                                forecast_hour=i,
+                                model_used="lstm_attention_48h"
+                            )
+                            session.add(forecast)
+                    else:
+                        # Nếu model dự báo nhiều điểm (multi-step)
+                        for i in range(len(preds_real)):
+                            forecast = ForecastLog(
+                                village_name=v.name,
+                                timestamp=latest_data.timestamp + timedelta(hours=i+1),
+                                predicted_aqi=float(preds_real[i]),
+                                forecast_hour=i+1,
+                                model_used="lstm_attention_48h"
+                            )
+                            session.add(forecast)
                     print(f"📈 LSTM Dự báo {v.name} thành công.")
                 except Exception as e:
                     print(f"❌ Lỗi LSTM dự báo cho {v.name}: {e}")
