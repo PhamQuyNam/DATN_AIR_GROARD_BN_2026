@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from app.core.database import get_session
 from app.models.db_models import Village, AlertConfig, AlertHistory, Recommendation, User
@@ -13,6 +13,12 @@ router = APIRouter()
 class AlertConfigUpdate(BaseModel):
     aqi_threshold: float
     is_active: bool
+
+class AlertConfigResponse(BaseModel):
+    village_name: str
+    aqi_threshold: float
+    is_active: bool
+    village_active: bool
 
 class RecommendationCreate(BaseModel):
     village_name: str
@@ -127,15 +133,35 @@ def get_active_alerts(session: Session = Depends(get_session)):
         .order_by(AlertHistory.timestamp.desc())
         .limit(10)
     ).all()
-    return {"data": alerts}
+    return {
+        "data": [
+            {
+                **alert.dict(),
+                "timestamp": alert.timestamp.replace(tzinfo=timezone.utc).isoformat() if alert.timestamp.tzinfo is None else alert.timestamp.isoformat()
+            }
+            for alert in alerts
+        ]
+    }
 
-@router.get("/config", response_model=List[AlertConfig])
+@router.get("/config", response_model=List[AlertConfigResponse])
 def get_alert_configs(session: Session = Depends(get_session)):
     """
-    Lấy danh sách cấu hình cảnh báo của tất cả làng nghề.
+    Lấy danh sách cấu hình cảnh báo kèm trạng thái hoạt động của làng nghề.
     """
-    configs = session.exec(select(AlertConfig)).all()
-    return configs
+    # Join AlertConfig với Village để lấy trạng thái đồng bộ
+    results = session.exec(
+        select(AlertConfig, Village.is_active)
+        .join(Village, AlertConfig.village_name == Village.name)
+    ).all()
+    
+    return [
+        AlertConfigResponse(
+            village_name=conf.village_name,
+            aqi_threshold=conf.aqi_threshold,
+            is_active=conf.is_active,
+            village_active=v_active
+        ) for conf, v_active in results
+    ]
 
 @router.post("/config/{village_name}")
 def update_alert_config(
@@ -159,11 +185,20 @@ def update_alert_config(
             aqi_threshold=config_update.aqi_threshold,
             is_active=config_update.is_active
         )
+        # Đồng bộ trạng thái sang Village
+        village.is_active = config_update.is_active
         session.add(config)
+        session.add(village)
     else:
         config.aqi_threshold = config_update.aqi_threshold
         config.is_active = config_update.is_active
         
+        # Đồng bộ trạng thái sang Village tương ứng
+        village = session.exec(select(Village).where(Village.name == village_name)).first()
+        if village:
+            village.is_active = config_update.is_active
+            session.add(village)
+            
     session.commit()
     session.refresh(config)
     

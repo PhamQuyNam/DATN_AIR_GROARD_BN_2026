@@ -6,24 +6,24 @@ import { toast } from 'react-toastify';
 import api from '../../services/api';
 
 const ALL_VILLAGES = [
-  { name: 'Phong Khê', location: 'P. Phong Khê, TP. Bắc Ninh' },
-  { name: 'Văn Môn', location: 'X. Văn Môn, H. Yên Phong' },
+  { name: 'Đa Hội', location: 'P. Châu Khê, TP. Từ Sơn' },
   { name: 'Đồng Kỵ', location: 'P. Đồng Kỵ, TP. Từ Sơn' },
-  { name: 'Tràng An', location: 'P. Tràng An, TP. Từ Sơn' },
+  { name: 'Phù Khê', location: 'P. Phù Khê, TP. Từ Sơn' },
+  { name: 'Hương Mạc', location: 'P. Hương Mạc, TP. Từ Sơn' },
+  { name: 'Đình Bảng', location: 'P. Đình Bảng, TP. Từ Sơn' },
+  { name: 'Văn Môn', location: 'X. Văn Môn, H. Yên Phong' },
+  { name: 'Vọng Nguyệt', location: 'X. Tam Giang, H. Yên Phong' },
+  { name: 'Phong Khê', location: 'P. Phong Khê, TP. Bắc Ninh' },
+  { name: 'Khắc Niệm', location: 'P. Khắc Niệm, TP. Bắc Ninh' },
+  { name: 'Châm Khê', location: 'P. Phong Khê, TP. Bắc Ninh' },
+  { name: 'Phù Lãng', location: 'X. Phù Lãng, TX. Quế Võ' },
+  { name: 'Quả Cảm', location: 'P. Hòa Long, TP. Bắc Ninh' },
   { name: 'Đại Bái', location: 'X. Đại Bái, H. Gia Bình' },
   { name: 'Xuân Lai', location: 'X. Xuân Lai, H. Gia Bình' },
-  { name: 'Ninh Xá', location: 'P. Ninh Xá, TP. Bắc Ninh' },
-  { name: 'Tam Tảo', location: 'X. Phù Lâm, H. Tiên Du' },
-  { name: 'Vạn Nguyệt', location: 'X. Tam Giang, H. Yên Phong' },
+  { name: 'Môn Quảng', location: 'X. Quảng Phú, H. Lương Tài' },
   { name: 'Đông Hồ', location: 'X. Song Hồ, TX. Thuận Thành' },
   { name: 'Thanh Hoài', location: 'X. Thanh Khương, Thuận Thành' },
-  { name: 'Dương Ổ', location: 'P. Châu Khê, TP. Từ Sơn' },
-  { name: 'Phù Khê', location: 'P. Phù Khê, TP. Từ Sơn' },
-  { name: 'Phù Lãng', location: 'X. Phù Lãng, TX. Quế Võ' },
-  { name: 'Quế Cầm', location: 'P. Hòa Long, TP. Bắc Ninh' },
-  { name: 'Môn Quảng', location: 'X. Đình Tổ, H. Thuận Thành' },
-  { name: 'Tương Giang', location: 'P. Tương Giang, TP. Từ Sơn' },
-  { name: 'Vọng Nguyệt', location: 'X. Tam Giang, H. Yên Phong' },
+  { name: 'Tam Tảo', location: 'X. Phú Lâm, H. Tiên Du' },
 ];
 
 export default function CitizenStations() {

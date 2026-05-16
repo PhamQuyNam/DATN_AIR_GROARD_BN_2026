@@ -4,7 +4,7 @@ Cổng người dân: quản lý trạm yêu thích, xem feed AQI + cảnh báo 
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from app.core.database import get_session
 from app.models.db_models import (
@@ -35,9 +35,19 @@ def add_favorite(
     session: Session = Depends(get_session)
 ):
     """Thêm một làng vào danh sách quan tâm của người dùng."""
-    village = session.exec(select(Village).where(Village.name == village_name)).first()
+    # Tìm kiếm không phân biệt hoa thường
+    village = session.exec(
+        select(Village).where(Village.name.ilike(village_name))
+    ).first()
+    
     if not village:
-        raise HTTPException(status_code=404, detail="Không tìm thấy làng nghề")
+        # Nếu không tìm thấy, thử tìm kiếm tương đối (cho phép khớp một phần)
+        village = session.exec(
+            select(Village).where(Village.name.contains(village_name))
+        ).first()
+        
+    if not village:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy làng nghề: {village_name}")
 
     # Kiểm tra đã tồn tại chưa
     existing = session.exec(
@@ -106,17 +116,16 @@ def get_citizen_feed(
             .where(AlertHistory.village_name == village_name)
             .where(AlertHistory.is_approved == True)
             .order_by(AlertHistory.approved_at.desc())
-            .limit(3)
+            .limit(20)  # Tăng từ 3 → 20 để hiển thị đủ cảnh báo
         ).all()
 
-        # ── Khuyến nghị mới nhất từ Manager ───────────────────────────────────
-        latest_rec = session.exec(
+        # ── Tất cả khuyến nghị đang hoạt động từ Manager ──────────────────────
+        all_recs = session.exec(
             select(Recommendation)
             .where(Recommendation.village_name == village_name)
             .where(Recommendation.is_active == True)
             .order_by(Recommendation.created_at.desc())
-            .limit(1)
-        ).first()
+        ).all()
 
         stations_data.append({
             "village_name": village_name,
@@ -135,13 +144,20 @@ def get_citizen_feed(
                     "message": a.message,
                     "aqi_value": a.aqi_value,
                     "threshold_value": a.threshold_value,
-                    "approved_at": a.approved_at,
+                    "approved_at": a.approved_at.replace(tzinfo=timezone.utc).isoformat() if a.approved_at and a.approved_at.tzinfo is None else (a.approved_at.isoformat() if a.approved_at else None),
                 }
                 for a in approved_alerts
             ],
-            # Khuyến nghị (tách riêng với cảnh báo)
-            "recommendation": latest_rec.content if latest_rec else None,
-            "rec_time": latest_rec.created_at if latest_rec else None,
+            # Tất cả khuyến nghị đang hoạt động (không giới hạn 1 bản)
+            "recommendation": all_recs[0].content if all_recs else None,
+            "rec_time": all_recs[0].created_at.replace(tzinfo=timezone.utc).isoformat() if all_recs and all_recs[0].created_at.tzinfo is None else (all_recs[0].created_at.isoformat() if all_recs else None),
+            "all_recommendations": [
+                {
+                    "content": r.content,
+                    "created_at": r.created_at.replace(tzinfo=timezone.utc).isoformat() if r.created_at.tzinfo is None else r.created_at.isoformat(),
+                }
+                for r in all_recs
+            ],
         })
 
     return {

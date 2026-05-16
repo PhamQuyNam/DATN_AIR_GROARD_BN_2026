@@ -20,18 +20,21 @@ if os.path.exists("/app"):
 engine = create_engine(DATABASE_URL, echo=True)
 
 def init_db():
+    # Import models here to register them with SQLModel.metadata
+    from app.models import db_models
+    
     max_retries = 5
     for attempt in range(max_retries):
         try:
             SQLModel.metadata.create_all(engine)
-            print("✅ Database initialized successfully!")
+            print("Database initialized successfully!")
             break
         except OperationalError as e:
             if attempt < max_retries - 1:
-                print(f"⚠️ Database not ready (attempt {attempt+1}/{max_retries}). Retrying in 5s...")
+                print(f"Database not ready (attempt {attempt+1}/{max_retries}). Retrying in 5s...")
                 time.sleep(5)
             else:
-                print("❌ Max retries reached. Database connection failed.")
+                print("Max retries reached. Database connection failed.")
                 raise e
 
 def get_session():

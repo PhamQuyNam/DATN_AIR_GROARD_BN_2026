@@ -27,8 +27,10 @@ export default function CitizenAlerts() {
     (s.all_alerts || []).map(a => ({ ...a, village_name: s.village_name }))
   );
 
-  // Tổng hợp khuyến nghị
-  const recStations = stations.filter(s => s.recommendation);
+  // Tổng hợp khüyến nghị: flatten tất cả all_recommendations từ mọi trạm
+  const allRecommendations = stations.flatMap(s =>
+    (s.all_recommendations || []).map(r => ({ ...r, village_name: s.village_name }))
+  );
 
   return (
     <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -104,38 +106,38 @@ export default function CitizenAlerts() {
             )}
           </div>
 
-          {/* ── Khuyến nghị sức khỏe từ Sở TN&MT ───────────────────────────────── */}
+          {/* ── Khuyến nghị sức khỏe từ Sở TN&MT ─────────────────────────────────── */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
               <MessageSquare className="text-blue-500" size={18}/>
               <h3 className="font-bold text-gray-900 dark:text-white">Khuyến nghị sức khỏe từ Sở TN&MT</h3>
-              {recStations.length > 0 && (
-                <span className="ml-auto bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{recStations.length}</span>
+              {allRecommendations.length > 0 && (
+                <span className="ml-auto bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{allRecommendations.length}</span>
               )}
             </div>
-            {recStations.length === 0 ? (
+            {allRecommendations.length === 0 ? (
               <div className="p-8 text-center text-gray-400">
                 <MessageSquare size={32} className="mx-auto mb-2 opacity-30"/>
                 <p className="text-sm">Chưa có khuyến nghị nào dành cho trạm bạn theo dõi.</p>
               </div>
             ) : (
               <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                {recStations.map((s, i) => (
-                  <motion.div key={s.village_name}
+                {allRecommendations.map((r, i) => (
+                  <motion.div key={i}
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}
                     className="p-5">
                     <div className="flex items-center justify-between mb-2">
                       <span className="inline-flex items-center gap-1.5 text-xs font-semibold bg-blue-500/10 text-blue-500 px-2.5 py-1 rounded-full border border-blue-500/20">
-                        📍 {s.village_name}
+                        📍 {r.village_name}
                       </span>
-                      {s.rec_time && (
+                      {r.created_at && (
                         <span className="flex items-center gap-1 text-xs text-gray-400">
                           <Clock size={11}/>
-                          {new Date(s.rec_time).toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}
+                          {new Date(r.created_at).toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{s.recommendation}</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{r.content}</p>
                   </motion.div>
                 ))}
               </div>

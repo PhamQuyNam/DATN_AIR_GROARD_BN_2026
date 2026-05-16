@@ -36,16 +36,17 @@ def get_station_status(session: Session = Depends(get_session)):
             .limit(1)
         ).first()
 
-        if latest:
+        if latest and v.is_active:
+            # Chỉ Online khi được Admin BẬT và có dữ liệu mới
             is_online = latest.timestamp >= cutoff
             last_seen = latest.timestamp
             current_aqi = latest.aqi
             current_level = latest.level
         else:
             is_online = False
-            last_seen = None
-            current_aqi = None
-            current_level = "Không có dữ liệu"
+            last_seen = latest.timestamp if latest else None
+            current_aqi = latest.aqi if latest else None
+            current_level = latest.level if latest else "Không có dữ liệu"
 
         status = "ONLINE" if is_online else "OFFLINE"
         if is_online:
@@ -72,6 +73,7 @@ def get_station_status(session: Session = Depends(get_session)):
             "lon": v.lon,
             "status": status,
             "is_online": is_online,
+            "is_active": v.is_active,  # Trạng thái admin bật/tắt
             "current_aqi": current_aqi,
             "current_level": current_level,
             "last_seen": last_seen,
