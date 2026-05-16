@@ -13,8 +13,9 @@ from sqlmodel import Session, select
 from app.core.database import engine
 from app.models.db_models import AQILog, ForecastLog, Village
 
-# Tắt cảnh báo TF nếu có
+# Tắt cảnh báo TF và ép dùng Legacy Keras để sửa lỗi quantization_mode
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_USE_LEGACY_KERAS'] = '1'
 
 try:
     from tensorflow.keras.models import load_model
@@ -37,20 +38,20 @@ class InferenceService:
         self.lstm_meta = None
         self.xgb_model = None
         self.xgb_feat = None
-        self._load_models()
+        # Không nạp model khi khởi động để tránh treo server
 
     def _load_models(self):
+        # 1. Load LSTM
         try:
-            # Load LSTM
             if os.path.exists(self.LSTM_PATH) and os.path.exists(self.LSTM_META_PATH):
-                import tf_keras as keras
-                from tf_keras.layers import LSTM
-                from tf_keras.models import load_model
-                # Khắc phục lỗi tương thích phiên bản TensorFlow (time_major)
+                from tensorflow.keras.layers import LSTM
+                from tensorflow.keras.models import load_model
+                import tensorflow.keras as keras
                 class CustomLSTM(LSTM):
-                    def __init__(self, **kwargs):
+                    def __init__(self, *args, **kwargs):
                         kwargs.pop('time_major', None)
-                        super(CustomLSTM, self).__init__(**kwargs)
+                        kwargs.pop('quantization_mode', None)
+                        super().__init__(*args, **kwargs)
 
                 self.lstm_model = load_model(self.LSTM_PATH, compile=False, custom_objects={'LSTM': CustomLSTM})
                 with open(self.LSTM_META_PATH, 'r') as f:
@@ -58,8 +59,11 @@ class InferenceService:
                 print("🧠 LSTM model loaded successfully.")
             else:
                 print(f"⚠️ LSTM model/meta not found at {self.MODEL_DIR}/lstm")
+        except Exception as e:
+            print(f"❌ Error loading LSTM model: {e}")
 
-            # Load XGBoost
+        # 2. Load XGBoost
+        try:
             if os.path.exists(self.XGB_PATH) and os.path.exists(self.XGB_FEAT_PATH):
                 self.xgb_model = joblib.load(self.XGB_PATH)
                 with open(self.XGB_FEAT_PATH, 'r') as f:
@@ -67,23 +71,26 @@ class InferenceService:
                 print("🧠 XGBoost model loaded successfully.")
             else:
                 print(f"⚠️ XGBoost model/features not found at {self.MODEL_DIR}/xgboost")
-                
         except Exception as e:
-            print(f"❌ Error loading models: {e}")
+            print(f"❌ Error loading XGBoost model: {e}")
 
     def run_forecast_all(self):
         """Chạy dự báo (LSTM) và phân tích nguyên nhân (XGBoost SHAP) cho tất cả làng nghề"""
-        if not self.lstm_model or not self.xgb_model:
-            print("❌ Cannot run forecast: Models not fully loaded.")
+        # Tự động nạp model nếu chưa có (Lazy Loading)
+        if not self.xgb_model:
+            self._load_models()
+            
+        if not self.xgb_model:
+            print("❌ Cannot run: XGBoost model (SHAP) not loaded.")
             return
+
+        if not self.lstm_model:
+            print("⚠️ Warning: LSTM model not loaded. Skipping forecasting, only running SHAP analysis.")
 
         print(f"🔮 [{datetime.now()}] Bắt đầu quy trình Trí tuệ Nhân tạo (AI)...")
         
         with Session(engine) as session:
             villages = session.exec(select(Village)).all()
-            
-            lstm_window = 12 # Model .h5 cũ train với window=12
-            lstm_features = self.lstm_meta['config']['features'][:11] # Lấy đúng 11 features
             
             for v in villages:
                 # 1. Lấy dữ liệu 48 giờ gần nhất của làng nghề này
@@ -91,7 +98,7 @@ class InferenceService:
                     select(AQILog)
                     .where(AQILog.village_name == v.name)
                     .order_by(AQILog.timestamp.desc())
-                    .limit(lstm_window)
+                    .limit(12) # Model .h5 cũ train với window=12
                 ).all()
                 
                 # Sắp xếp lại theo thời gian tăng dần (cũ đến mới)
@@ -103,82 +110,83 @@ class InferenceService:
                 latest_data = recent_data[-1]
 
                 # ==========================================
-                # A. DỰ BÁO VỚI LSTM (6 giờ tới)
+                # A. DỰ BÁO VỚI LSTM (Chỉ chạy nếu load được model)
                 # ==========================================
-                try:
-                    # Chuyển sang DataFrame để dễ map cột
-                    df_recent = pd.DataFrame([d.dict() for d in recent_data])
-                    
-                    # Nếu không đủ 48h (vd chỉ có 10h), ta pad (copy) dòng đầu tiên cho đủ 48
-                    if len(df_recent) < lstm_window:
-                        missing = lstm_window - len(df_recent)
-                        pad_df = pd.DataFrame([df_recent.iloc[0].to_dict()] * missing)
-                        df_recent = pd.concat([pad_df, df_recent], ignore_index=True)
-                    
-                    # Tính toán các cột hour_sin, hour_cos nếu chưa có
-                    if 'hour_sin' not in df_recent.columns:
-                        df_recent['hour'] = pd.to_datetime(df_recent['timestamp']).dt.hour
-                        df_recent['hour_sin'] = np.sin(2 * np.pi * df_recent['hour'] / 24.0)
-                        df_recent['hour_cos'] = np.cos(2 * np.pi * df_recent['hour'] / 24.0)
+                if self.lstm_model and self.lstm_meta:
+                    try:
+                        lstm_window = 12
+                        lstm_features = self.lstm_meta['config']['features'][:11]
                         
-                    # Đổi tên cột aqi thành aqi_current để khớp với danh sách features của model
-                    if 'aqi' in df_recent.columns:
-                        df_recent['aqi_current'] = df_recent['aqi']
+                        # Chuyển sang DataFrame để dễ map cột
+                        df_recent = pd.DataFrame([d.dict() for d in recent_data])
                         
-                    # Trích xuất đúng 11 features mà LSTM cần
-                    X_raw = df_recent[lstm_features].fillna(0)
-                    
-                    # Chuẩn hóa (Scale) động dựa trên chính dữ liệu quá khứ gần nhất (Self-Scaling)
-                    means = X_raw.mean()
-                    stds = X_raw.std().replace(0, 1) # Tránh chia cho 0
-                    X_scaled = (X_raw - means) / stds
-                    
-                    # Lấy 12 giờ gần nhất và Reshape thành (1, 12, 11)
-                    X_lstm = X_scaled.values[-lstm_window:].reshape((1, lstm_window, len(lstm_features)))
-                    
-                    # Predict 6 horizon
-                    # LSTM output thường là (1, 6) nếu dự báo 6 step AQI
-                    preds_lstm = self.lstm_model.predict(X_lstm, verbose=0)[0]
-                    
-                    # Unscale ngược lại ra giá trị AQI thật
-                    mean_aqi = means.get('aqi_current', 84.0)
-                    std_aqi = stds.get('aqi_current', 42.0)
-                    preds_real = (preds_lstm * std_aqi) + mean_aqi
-                    
-                    # Lưu vào ForecastLog
-                    old_forecasts = session.exec(select(ForecastLog).where(ForecastLog.village_name == v.name)).all()
-                    for old in old_forecasts: session.delete(old)
-                    
-                    if len(preds_real) == 1:
-                        # Model chỉ dự báo 1 điểm (t+6), tiến hành nội suy tuyến tính (Linear Interpolation) 
-                        # từ AQI hiện tại đến điểm t+6 để biểu đồ frontend vẽ đủ 6 điểm
-                        current_aqi = df_recent['aqi_current'].iloc[-1]
-                        target_aqi_6h = float(preds_real[0])
+                        # Tính toán các cột hour_sin, hour_cos nếu chưa có
+                        if 'hour_sin' not in df_recent.columns:
+                            df_recent['hour'] = pd.to_datetime(df_recent['timestamp']).dt.hour
+                            df_recent['hour_sin'] = np.sin(2 * np.pi * df_recent['hour'] / 24.0)
+                            df_recent['hour_cos'] = np.cos(2 * np.pi * df_recent['hour'] / 24.0)
+                            
+                        # Đổi tên cột aqi thành aqi_current để khớp với danh sách features của model
+                        if 'aqi' in df_recent.columns:
+                            df_recent['aqi_current'] = df_recent['aqi']
+                            
+                        # Trích xuất đúng 11 features mà LSTM cần
+                        X_raw = df_recent[lstm_features].fillna(0)
                         
-                        for i in range(1, 7): # Từ t+1 đến t+6
-                            interpolated_aqi = current_aqi + (target_aqi_6h - current_aqi) * (i / 6.0)
-                            forecast = ForecastLog(
-                                village_name=v.name,
-                                timestamp=latest_data.timestamp + timedelta(hours=i),
-                                predicted_aqi=float(interpolated_aqi),
-                                forecast_hour=i,
-                                model_used="lstm_attention_48h"
-                            )
-                            session.add(forecast)
-                    else:
-                        # Nếu model dự báo nhiều điểm (multi-step)
-                        for i in range(len(preds_real)):
-                            forecast = ForecastLog(
-                                village_name=v.name,
-                                timestamp=latest_data.timestamp + timedelta(hours=i+1),
-                                predicted_aqi=float(preds_real[i]),
-                                forecast_hour=i+1,
-                                model_used="lstm_attention_48h"
-                            )
-                            session.add(forecast)
-                    print(f"📈 LSTM Dự báo {v.name} thành công.")
-                except Exception as e:
-                    print(f"❌ Lỗi LSTM dự báo cho {v.name}: {e}")
+                        # Chuẩn hóa (Scale) động dựa trên chính dữ liệu quá khứ gần nhất (Self-Scaling)
+                        means = X_raw.mean()
+                        stds = X_raw.std().replace(0, 1) 
+                        X_scaled = (X_raw - means) / stds
+                        
+                        # Reshape thành (1, 12, 11)
+                        X_lstm = X_scaled.values[-lstm_window:].reshape((1, lstm_window, len(lstm_features)))
+                        
+                        # Predict
+                        preds_lstm = self.lstm_model.predict(X_lstm, verbose=0)[0]
+                        
+                        # Unscale
+                        mean_aqi = means.get('aqi_current', 84.0)
+                        std_aqi = stds.get('aqi_current', 42.0)
+                        preds_real = (preds_lstm * std_aqi) + mean_aqi
+                        
+                        # Lưu vào ForecastLog
+                        # Lưu vào ForecastLog
+                        old_forecasts = session.exec(select(ForecastLog).where(ForecastLog.village_name == v.name)).all()
+                        for old in old_forecasts: session.delete(old)
+                        
+                        if len(preds_real) == 1:
+                            # Model chỉ dự báo 1 điểm (t+6), tiến hành nội suy tuyến tính (Linear Interpolation) 
+                            # từ AQI hiện tại đến điểm t+6 để biểu đồ frontend vẽ đủ 6 điểm
+                            current_aqi = df_recent['aqi_current'].iloc[-1]
+                            target_aqi_6h = float(preds_real[0])
+                            
+                            for i in range(1, 7): # Từ t+1 đến t+6
+                                interpolated_aqi = current_aqi + (target_aqi_6h - current_aqi) * (i / 6.0)
+                                forecast = ForecastLog(
+                                    village_name=v.name,
+                                    timestamp=latest_data.timestamp + timedelta(hours=i),
+                                    predicted_aqi=float(interpolated_aqi),
+                                    forecast_hour=i,
+                                    model_used="lstm_attention_48h"
+                                )
+                                session.add(forecast)
+                        else:
+                            # Nếu model dự báo nhiều điểm (multi-step)
+                            for i in range(len(preds_real)):
+                                forecast = ForecastLog(
+                                    village_name=v.name,
+                                    timestamp=latest_data.timestamp + timedelta(hours=i+1),
+                                    predicted_aqi=float(preds_real[i]),
+                                    forecast_hour=i+1,
+                                    model_used="lstm_attention_48h"
+                                )
+                                session.add(forecast)
+                        print(f"📈 LSTM Dự báo {v.name} thành công.")
+                    except Exception as e:
+                        print(f"❌ Lỗi LSTM dự báo cho {v.name}: {e}")
+                else:
+                    # Nếu không có LSTM, ta xóa dự báo cũ để tránh hiển thị sai lệch
+                    pass
 
                 # ==========================================
                 # B. PHÂN TÍCH NGUYÊN NHÂN VỚI XGBOOST & SHAP

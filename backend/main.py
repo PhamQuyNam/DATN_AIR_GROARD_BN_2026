@@ -27,29 +27,35 @@ app.add_middleware(
 )
 
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
     init_db()
     # Seed tài khoản Admin mặc định
     from app.core.database import engine
     from sqlmodel import Session
     from app.services.auth_service import seed_default_admin
     from app.services.alert_service import seed_alert_configs
-    from app.services.collector_service import AQICollector
-    from app.services.inference_service import inference_service
-    from app.services.alert_service import check_and_create_alerts
 
     with Session(engine) as session:
         seed_default_admin(session)
     seed_alert_configs()
     
-    # Kéo bù dữ liệu 48h khi khởi động
-    try:
-        AQICollector.backfill_history_48h()
-        # Cập nhật dự báo & cảnh báo ngay lập tức
-        inference_service.run_forecast_all()
-        check_and_create_alerts()
-    except Exception as e:
-        print(f"Lỗi khi chạy backfill lúc startup: {e}")
+    # Chạy các tác vụ nặng trong background để không làm treo Startup
+    def startup_background_tasks():
+        try:
+            from app.services.collector_service import AQICollector
+            from app.services.inference_service import inference_service
+            from app.services.alert_service import check_and_create_alerts
+            
+            print("🚀 [Background] Starting initial data backfill and AI inference...")
+            AQICollector.backfill_history_48h()
+            inference_service.run_forecast_all()
+            check_and_create_alerts()
+            print("✅ [Background] Initial startup tasks completed.")
+        except Exception as e:
+            print(f"❌ Lỗi trong background startup: {e}")
+
+    import threading
+    threading.Thread(target=startup_background_tasks).start()
 
     start_scheduler()
 

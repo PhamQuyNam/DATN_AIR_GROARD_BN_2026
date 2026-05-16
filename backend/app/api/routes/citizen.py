@@ -4,7 +4,7 @@ Cổng người dân: quản lý trạm yêu thích, xem feed AQI + cảnh báo 
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from app.core.database import get_session
 from app.models.db_models import (
@@ -144,17 +144,17 @@ def get_citizen_feed(
                     "message": a.message,
                     "aqi_value": a.aqi_value,
                     "threshold_value": a.threshold_value,
-                    "approved_at": a.approved_at,
+                    "approved_at": a.approved_at.replace(tzinfo=timezone.utc).isoformat() if a.approved_at and a.approved_at.tzinfo is None else (a.approved_at.isoformat() if a.approved_at else None),
                 }
                 for a in approved_alerts
             ],
             # Tất cả khuyến nghị đang hoạt động (không giới hạn 1 bản)
             "recommendation": all_recs[0].content if all_recs else None,
-            "rec_time": all_recs[0].created_at if all_recs else None,
+            "rec_time": all_recs[0].created_at.replace(tzinfo=timezone.utc).isoformat() if all_recs and all_recs[0].created_at.tzinfo is None else (all_recs[0].created_at.isoformat() if all_recs else None),
             "all_recommendations": [
                 {
                     "content": r.content,
-                    "created_at": r.created_at,
+                    "created_at": r.created_at.replace(tzinfo=timezone.utc).isoformat() if r.created_at.tzinfo is None else r.created_at.isoformat(),
                 }
                 for r in all_recs
             ],

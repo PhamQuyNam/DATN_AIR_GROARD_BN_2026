@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from app.core.database import get_session
 from app.models.db_models import Village, AlertConfig, AlertHistory, Recommendation, User
@@ -133,7 +133,15 @@ def get_active_alerts(session: Session = Depends(get_session)):
         .order_by(AlertHistory.timestamp.desc())
         .limit(10)
     ).all()
-    return {"data": alerts}
+    return {
+        "data": [
+            {
+                **alert.dict(),
+                "timestamp": alert.timestamp.replace(tzinfo=timezone.utc).isoformat() if alert.timestamp.tzinfo is None else alert.timestamp.isoformat()
+            }
+            for alert in alerts
+        ]
+    }
 
 @router.get("/config", response_model=List[AlertConfigResponse])
 def get_alert_configs(session: Session = Depends(get_session)):
